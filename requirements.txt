@@ -1,0 +1,26 @@
+# FASE 7 — Backend FastAPI (persistencia en memoria)
+# Python 3.11 o 3.12
+#
+#   cd backend
+#   py -m venv .venv
+#   .venv\Scripts\activate            (Windows)
+#   pip install -r requirements.txt
+#   uvicorn app.main:app --reload
+
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30
+pydantic[email]>=2.8,<3
+pydantic-settings>=2.4
+
+# Base de datos (FASE 8)
+sqlalchemy>=2.0,<3
+alembic>=1.13
+psycopg[binary]>=3.2   # driver PostgreSQL
+
+# Autenticacion: contrasenas hasheadas (bcrypt) y tokens JWT
+pwdlib[bcrypt]>=0.2
+pyjwt>=2.9
+
+# Desarrollo / pruebas
+pytest>=8.2
+httpx>=0.27            # cliente para los tests de la API
