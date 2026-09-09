@@ -59,8 +59,8 @@ def upgrade() -> None:
     op.execute(
         sa.text(
             """
-            INSERT INTO usuarios (id, nombre, correo, contrasena_hash)
-            SELECT 1, 'Usuario', 'usuario@chaskipe.local', :pwd
+            INSERT INTO usuarios (id, nombre, correo, contrasena_hash, creado_en)
+            SELECT 1, 'Usuario', 'usuario@chaskipe.local', :pwd, CURRENT_TIMESTAMP
             WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE id = 1)
             """
         ).bindparams(pwd=UNUSABLE_PASSWORD)
