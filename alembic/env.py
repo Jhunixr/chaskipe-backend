@@ -13,7 +13,9 @@ from app.db.base import Base
 config = context.config
 
 # La URL viene de la config de la app (env CHASKIPE_DATABASE_URL).
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# `%` se escapa: configparser lo trata como interpolacion y una contrasena con
+# `%` romperia la migracion.
+config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

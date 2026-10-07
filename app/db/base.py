@@ -1,6 +1,7 @@
 """Modelos ORM y motor de base de datos (FASE 8)."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
 from sqlalchemy import (
@@ -8,9 +9,11 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     String,
     Text,
     create_engine,
+    make_url,
 )
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -22,6 +25,8 @@ from sqlalchemy.orm import (
 )
 
 from app.core.config import settings
+
+log = logging.getLogger("chaskipe.db")
 
 
 class Base(DeclarativeBase):
@@ -53,10 +58,15 @@ class PreferenciaAccesibilidad(Base):
     """Preferencias de accesibilidad de un usuario (una fila por usuario)."""
 
     __tablename__ = "preferencias_accesibilidad"
+    # Nombre del indice tal como lo crea la migracion b2f41a9c7d13; con
+    # `index=True` SQLAlchemy esperaria otro nombre y `alembic check` falla.
+    __table_args__ = (
+        Index("ix_preferencias_usuario_id", "usuario_id", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     usuario_id: Mapped[int] = mapped_column(
-        ForeignKey("usuarios.id", ondelete="CASCADE"), unique=True, index=True
+        ForeignKey("usuarios.id", ondelete="CASCADE")
     )
     tema: Mapped[str] = mapped_column(String(10), default="sistema")
     tamano_texto: Mapped[str] = mapped_column(String(12), default="normal")
@@ -235,7 +245,13 @@ def init_engine() -> bool:
 
     url = settings.database_url.strip()
     if not url:
+        log.warning("CHASKIPE_DATABASE_URL vacia: persistencia en memoria.")
         return False
+
+    try:
+        safe_url = make_url(url).render_as_string(hide_password=True)
+    except Exception:
+        safe_url = "(URL invalida)"
 
     try:
         _engine = create_engine(url, pool_pre_ping=True, future=True)
@@ -244,8 +260,16 @@ def init_engine() -> bool:
         _SessionLocal = sessionmaker(
             bind=_engine, autoflush=False, expire_on_commit=False
         )
+        log.info("Conectado a la base de datos %s", safe_url)
         return True
-    except Exception:
+    except Exception as exc:
+        # Antes el motivo se perdia: la API caia a memoria sin decir por que.
+        log.warning(
+            "No se pudo conectar a %s (%s: %s). Persistencia en memoria.",
+            safe_url,
+            type(exc).__name__,
+            str(exc).splitlines()[0] if str(exc) else "",
+        )
         _engine = None
         _SessionLocal = None
         return False

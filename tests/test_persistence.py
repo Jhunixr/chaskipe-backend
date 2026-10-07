@@ -8,6 +8,7 @@ Pruebas de la capa de persistencia.
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -16,7 +17,13 @@ from app.db.base import init_engine
 from app.schemas.history import HistoryEntryCreate
 from app.schemas.preferences import Preferences
 from app.services import store
-from app.services.repository import EmailAlreadyUsed, MemoryRepository, SqlRepository
+from app.schemas.signs import DatasetSampleStored, RecognitionReportCreate
+from app.services.repository import (
+    EmailAlreadyUsed,
+    MemoryRepository,
+    SqlRepository,
+    seed_database,
+)
 
 _DB_AVAILABLE = init_engine()
 
@@ -100,3 +107,36 @@ def test_sql_aislamiento_entre_cuentas() -> None:
     assert entry.id not in [e.id for e in repo.list_history(b.id)]
     assert repo.delete_history(b.id, entry.id) is False
     assert repo.delete_history(a.id, entry.id) is True
+
+
+@pytest.mark.skipif(not _DB_AVAILABLE, reason="PostgreSQL no disponible")
+def test_sql_vocabulario_reportes_y_dataset() -> None:
+    """Senas sembradas, reportes, modelos y registro de muestras en PostgreSQL."""
+    store.configure_repository()
+    repo = SqlRepository()
+
+    labels = [s.label for s in repo.list_signs()]
+    assert {"HOLA", "REPOSO", "A", "ENYE", "Z"} <= set(labels)
+    assert repo.get_sign("NOEXISTE") is None
+
+    # sembrar dos veces no duplica
+    seed_database()
+    assert len(repo.list_signs()) == len(labels)
+
+    report = repo.add_report(None, RecognitionReportCreate(recognized="M", expected="N"))
+    assert report.id
+
+    assert any(m.version == "letras-v1" for m in repo.list_models())
+
+    before = {c.label: c.samples for c in repo.dataset_summary().labels}
+    sample = DatasetSampleStored(
+        id=uuid.uuid4().hex[:12],
+        label="Q",
+        file="Q/Q__prueba.json",
+        frames=10,
+        duration_ms=500,
+        created_at=datetime.now(timezone.utc),
+    )
+    repo.add_sample(sample, consent=True, notes="test")
+    after = {c.label: c.samples for c in repo.dataset_summary().labels}
+    assert after["Q"] == before["Q"] + 1
