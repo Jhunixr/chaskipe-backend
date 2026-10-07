@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from app.services.repository import CATEGORY_ORDER
+
 API = "/api/v1"
 
 
@@ -96,14 +98,12 @@ def test_phrases_es_publico(anon: TestClient) -> None:
     r = anon.get(f"{API}/phrases")
     assert r.status_code == 200
     groups = r.json()
-    assert [g["category"] for g in groups] == [
-        "saludos",
-        "necesidades",
-        "emergencias",
-    ]
+    assert [g["category"] for g in groups] == CATEGORY_ORDER
     all_phrases = [p for g in groups for p in g["phrases"]]
     assert all(p["is_demo"] for p in all_phrases)
     assert any(p["text"] == "Necesito ayuda" for p in all_phrases)
+    assert len(all_phrases) >= 50
+    assert len({p["id"] for p in all_phrases}) == len(all_phrases)
 
 
 def test_cors_headers(client: TestClient) -> None:

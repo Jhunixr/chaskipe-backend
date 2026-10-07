@@ -19,6 +19,7 @@ from app.schemas.preferences import Preferences
 from app.services import store
 from app.schemas.signs import DatasetSampleStored, RecognitionReportCreate
 from app.services.repository import (
+    CATEGORY_ORDER,
     EmailAlreadyUsed,
     MemoryRepository,
     SqlRepository,
@@ -84,11 +85,7 @@ def test_sql_repository_roundtrip() -> None:
 
     # frases (catalogo compartido)
     groups = repo.list_phrase_groups()
-    assert [g.category for g in groups] == [
-        "saludos",
-        "necesidades",
-        "emergencias",
-    ]
+    assert [g.category for g in groups] == CATEGORY_ORDER
 
 
 @pytest.mark.skipif(not _DB_AVAILABLE, reason="PostgreSQL no disponible")
@@ -120,8 +117,10 @@ def test_sql_vocabulario_reportes_y_dataset() -> None:
     assert repo.get_sign("NOEXISTE") is None
 
     # sembrar dos veces no duplica
+    phrases_before = sum(len(g.phrases) for g in repo.list_phrase_groups())
     seed_database()
     assert len(repo.list_signs()) == len(labels)
+    assert sum(len(g.phrases) for g in repo.list_phrase_groups()) == phrases_before
 
     report = repo.add_report(None, RecognitionReportCreate(recognized="M", expected="N"))
     assert report.id

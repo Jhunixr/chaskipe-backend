@@ -53,10 +53,22 @@ from app.services.vocabulary import SEED_MODELS, seed_signs
 
 CATEGORY_LABELS = {
     "saludos": "Saludos",
+    "respuestas": "Respuestas rapidas",
     "necesidades": "Necesidades",
+    "salud": "Salud",
+    "transporte": "Transporte",
+    "compras": "Compras y tramites",
     "emergencias": "Emergencias",
 }
-CATEGORY_ORDER = ["saludos", "necesidades", "emergencias"]
+CATEGORY_ORDER = [
+    "saludos",
+    "respuestas",
+    "necesidades",
+    "salud",
+    "transporte",
+    "compras",
+    "emergencias",
+]
 
 
 class EmailAlreadyUsed(Exception):
@@ -68,15 +80,72 @@ def _now() -> datetime:
 
 
 def _seed_phrases() -> list[QuickPhrase]:
-    """Frases semilla. `is_demo=True`: senas LSP no validadas."""
+    """
+    Frases semilla. `is_demo=True`: las senas LSP asociadas no estan validadas.
+
+    Los ids son estables: al arrancar se insertan las que falten, asi una base
+    ya desplegada recibe las nuevas sin perder las existentes.
+    Espejo de `QUICK_PHRASE_GROUPS` en `frontend/src/services/mockData.ts`.
+    """
     raw = [
+        # Saludos
         ("ph-hola", "Hola", "saludos"),
+        ("ph-buenos-dias", "Buenos días", "saludos"),
+        ("ph-buenas-tardes", "Buenas tardes", "saludos"),
+        ("ph-buenas-noches", "Buenas noches", "saludos"),
         ("ph-gracias", "Gracias", "saludos"),
         ("ph-por-favor", "Por favor", "saludos"),
+        ("ph-de-nada", "De nada", "saludos"),
+        ("ph-adios", "Adiós, cuídese", "saludos"),
+        ("ph-mucho-gusto", "Mucho gusto", "saludos"),
+        ("ph-soy-sordo", "Soy una persona sorda, uso lengua de señas", "saludos"),
+        # Respuestas rapidas
+        ("ph-si", "Sí", "respuestas"),
+        ("ph-no", "No", "respuestas"),
+        ("ph-no-se", "No sé", "respuestas"),
+        ("ph-espere", "Espere un momento, por favor", "respuestas"),
+        ("ph-repita", "¿Puede repetirlo, por favor?", "respuestas"),
+        ("ph-despacio", "Más despacio, por favor", "respuestas"),
+        ("ph-escribalo", "¿Puede escribirlo, por favor?", "respuestas"),
+        ("ph-entiendo", "Entiendo", "respuestas"),
+        ("ph-de-acuerdo", "De acuerdo", "respuestas"),
+        # Necesidades
         ("ph-ayuda", "Necesito ayuda", "necesidades"),
         ("ph-no-entiendo", "No entiendo", "necesidades"),
-        ("ph-bano", "¿Donde esta el bano?", "necesidades"),
+        ("ph-bano", "¿Dónde está el baño?", "necesidades"),
+        ("ph-agua", "Quisiera un vaso de agua", "necesidades"),
+        ("ph-perdido", "Estoy perdido, ¿me puede ayudar?", "necesidades"),
+        ("ph-interprete", "¿Hay un intérprete de lengua de señas?", "necesidades"),
+        ("ph-cargar-celular", "¿Dónde puedo cargar mi celular?", "necesidades"),
+        # Salud
+        ("ph-me-siento-mal", "Me siento mal", "salud"),
+        ("ph-me-duele", "Me duele aquí", "salud"),
+        ("ph-doctor", "Necesito un médico", "salud"),
+        ("ph-alergia", "Soy alérgico a un medicamento", "salud"),
+        ("ph-medicina", "Tomo esta medicina", "salud"),
+        ("ph-cita", "Tengo una cita médica", "salud"),
+        ("ph-farmacia", "¿Dónde hay una farmacia?", "salud"),
+        # Transporte
+        ("ph-como-llego", "¿Cómo llego a esta dirección?", "transporte"),
+        ("ph-bus", "¿Este bus va a…?", "transporte"),
+        ("ph-bajo-aqui", "Bajo en el siguiente paradero", "transporte"),
+        ("ph-taxi", "Necesito un taxi", "transporte"),
+        ("ph-cuanto-pasaje", "¿Cuánto es el pasaje?", "transporte"),
+        # Compras y tramites
+        ("ph-cuanto-cuesta", "¿Cuánto cuesta?", "compras"),
+        ("ph-tarjeta", "¿Puedo pagar con tarjeta?", "compras"),
+        ("ph-yape", "¿Puedo pagar con Yape o Plin?", "compras"),
+        ("ph-boleta", "¿Me da boleta, por favor?", "compras"),
+        ("ph-turno", "¿Dónde hago la cola?", "compras"),
+        ("ph-dni", "Aquí está mi DNI", "compras"),
+        # Emergencias
         ("ph-emergencias", "Llame a emergencias", "emergencias"),
+        ("ph-ambulancia", "Llame a una ambulancia (106)", "emergencias"),
+        ("ph-policia", "Llame a la policía (105)", "emergencias"),
+        ("ph-bomberos", "Llame a los bomberos (116)", "emergencias"),
+        ("ph-robo", "Me robaron", "emergencias"),
+        ("ph-accidente", "Hubo un accidente", "emergencias"),
+        ("ph-familiar", "Llame a mi familiar, este es su número", "emergencias"),
     ]
     return [
         QuickPhrase(id=i, text=t, category=c)  # type: ignore[arg-type]
@@ -648,24 +717,26 @@ def _sql_list_signs(s: Session) -> list[Sign]:
 
 def seed_database() -> None:
     """
-    Inserta el catalogo de frases si esta vacio, las senas del vocabulario que
-    falten y los modelos conocidos que falten. Lo existente no se modifica.
+    Inserta las frases rapidas, las senas del vocabulario y los modelos
+    conocidos que falten (por id/etiqueta/version). Lo existente no se modifica.
 
     NO crea usuarios: las cuentas se crean al registrarse.
     """
     with get_session() as s:
-        if s.scalar(select(Frase).limit(1)) is None:
-            for order, p in enumerate(_seed_phrases()):
-                s.add(
-                    Frase(
-                        id=p.id,
-                        texto=p.text,
-                        categoria=p.category,
-                        orden=order,
-                        es_demo=p.is_demo,
-                    )
+        known = set(s.scalars(select(Frase.id)).all())
+        for order, p in enumerate(_seed_phrases()):
+            if p.id in known:
+                continue
+            s.add(
+                Frase(
+                    id=p.id,
+                    texto=p.text,
+                    categoria=p.category,
+                    orden=order,
+                    es_demo=p.is_demo,
                 )
-            s.commit()
+            )
+        s.commit()
 
         existing = set(s.scalars(select(Sena.etiqueta)).all())
         missing = [sg for sg in seed_signs() if sg.label not in existing]
