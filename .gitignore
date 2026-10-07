@@ -24,3 +24,6 @@ Thumbs.db
 desktop.ini
 .idea/
 .vscode/
+
+# Muestras subidas en desarrollo (CHASKIPE_DATASET_DIR)
+data/

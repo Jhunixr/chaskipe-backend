@@ -5,7 +5,15 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-Category = Literal["saludos", "necesidades", "emergencias"]
+Category = Literal[
+    "saludos",
+    "respuestas",
+    "necesidades",
+    "salud",
+    "transporte",
+    "compras",
+    "emergencias",
+]
 
 
 class QuickPhrase(BaseModel):

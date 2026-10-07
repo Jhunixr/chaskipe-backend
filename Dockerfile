@@ -21,9 +21,16 @@ COPY . .
 RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 
 # No correr como root: si alguien escapa del proceso, no es administrador.
+# /app/data/dataset guarda las muestras subidas desde la app
+# (CHASKIPE_DATASET_DIR). En Dokploy hay que montar ahi un volumen, o se
+# pierden en cada despliegue.
 RUN useradd --create-home --uid 1000 chaskipe \
+    && mkdir -p /app/data/dataset \
     && chown -R chaskipe:chaskipe /app
 USER chaskipe
+
+ENV CHASKIPE_DATASET_DIR=/app/data/dataset
+VOLUME ["/app/data"]
 
 EXPOSE 8000
 

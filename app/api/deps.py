@@ -42,3 +42,18 @@ def current_user(
 
 
 CurrentUser = Annotated[AuthUser, Depends(current_user)]
+
+
+def optional_user(
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> AuthUser | None:
+    """
+    Usuario si hay un token valido; None si no hay token. Un token invalido
+    sigue siendo 401: la app debe saber que su sesion caduco.
+    """
+    if creds is None:
+        return None
+    return current_user(creds)
+
+
+OptionalUser = Annotated[AuthUser | None, Depends(optional_user)]
